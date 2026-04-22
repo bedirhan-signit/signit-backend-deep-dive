@@ -69,7 +69,7 @@ Only start this phase after Phase 1 is running end to end.
    - the list of participants,
    - the creation date,
    - a brief content summary.
-   Any approach to generating the summary is acceptable — a real model call, a cheap stub, or a hand-rolled extractor. The shape of the integration matters more than the text itself.
+   The content summary must be produced by integrating with a real LLM provider — OpenAI, Anthropic Claude, Google Gemini, or an equivalent. What we care about is the shape of the integration: how you handle the API key, how you design the prompt, how you parse the response, and how you handle errors and timeouts. The quality of the summary text itself is secondary.
 3. The signature request is flagged as `vaulted`.
 
 ---
