@@ -2,51 +2,87 @@
 
 Welcome. This repository is the briefing packet for your backend deep-dive interview.
 
+The assignment is split into **Phase 1** and **Phase 2**. Phase 1 is the required build. Phase 2 is an extension — attempt it only if Phase 1 is working end to end with time to spare.
+
 ---
 
-## Assignment
+## Phase 1 — signature request service
 
-Build a small signature request service.
+Build a small backend service that models the core signature request flow.
 
-A user can:
+### The flow
 
-1. Upload one or more documents into a single signature request. Each document is typed as either **primary** or **supplement**.
-2. Define the signatories on the request. A signatory is just a name and an email address. Signatories are unique within a request by email address.
-3. For each supplement document, specify which signatories are allowed to see it. Primary documents are always visible to every signatory.
+1. **Upload documents.**
+   The sender uploads one or more files. For each file, they provide its **type** — either `primary` or `supplement`.
+   - Primary documents are included in every signatory's bundle.
+   - Supplement documents are only included for the signatories the sender explicitly allows.
 
-Creating a signature request returns its `id` and a creation timestamp.
+2. **Create the signature request.**
+   The sender creates a signature request that references the uploaded documents and provides the **signatories**. A signatory is identified by a **name** and an **email address**. Signatories are unique within a request by email.
+   For each supplement document in the request, the sender includes the list of signatory emails that should be able to see it.
 
-## Signing
+3. **Persist the state.**
+   When the request is created, the service persists everything needed to drive the rest of the flow:
+   - the signature request itself, with its `id` and a creation timestamp,
+   - the documents attached to it, their types, and their per-signatory visibility (for supplements),
+   - the signatories, each with an initial action status of `pending`,
+   - a **signing token**, unique per signatory, generated at creation time.
 
-- When a signature request is created, a signing **token** is generated for each signatory. The token carries enough information to identify both the request and the signatory it belongs to.
-- Tokens are written to the application log or to a local file. There is no email delivery.
-- A mock signing endpoint accepts a POST request with a token. If the token is valid, the signatory is marked as signed.
-- After every signatory has signed, the signature request is automatically marked as completed.
+4. **Sign.**
+   Each signatory signs by calling the signing endpoint with their token. The service validates the token, resolves the signatory it belongs to, and flips that signatory's action status from `pending` to `signed`. An invalid or already-used token is rejected.
 
-## Validation errors
+5. **Auto-complete.**
+   As soon as every signatory on the request has signed, the service automatically marks the signature request as `completed`.
+
+### Token handling
+
+- A signing token is generated for each signatory at request creation.
+- Every token is unique and identifies exactly one signatory on exactly one signature request.
+- Tokens are written to the application log or to a local file. There is no email or SMS delivery — the interviewer will read the token from your logs during the session.
+- The signing endpoint accepts the token in the request body and performs all validation server-side.
+
+### Validation
 
 The service must reject these at creation time with a clear error:
 
-- Two signatories sharing the same email address on the same request.
-- A visibility list passed on a primary document — primary documents are always visible to all signatories, so a visibility list on one is meaningless.
+- Two signatories on the same request sharing the same email address.
+- A visibility list supplied on a primary document — primary documents are always visible to every signatory, so a list on one is meaningless.
 
-## Optional extension — vault and summary
+### Endpoints
 
-If the core build is working with time to spare:
+You choose the exact shapes, but the service must expose at least:
 
-1. Move completed signature requests into a **vault** record.
-2. The vault record carries a short summary describing the request: document name, participants, creation date, and a brief content summary. Any approach for generating the summary is acceptable — a stub is fine, we care about the shape of the integration.
-3. Flag the signature request as vaulted.
+- An endpoint to **upload** a file, which returns the file's id and stored type.
+- An endpoint to **create a signature request**, which accepts the documents, the signatories, and the supplement-visibility mapping, and returns the request's id and creation timestamp.
+- An endpoint to **read the documents** a given signatory is allowed to see for a given request.
+- An endpoint to **sign**, which accepts a token and flips the signatory's status to `signed`. When the last signatory signs, the request is marked `completed`.
+
+---
+
+## Phase 2 — vault and summary
+
+Only start this phase after Phase 1 is running end to end.
+
+1. When a signature request is `completed`, it moves into a **vault** record.
+2. The vault record carries a short summary of the request:
+   - the document names,
+   - the list of participants,
+   - the creation date,
+   - a brief content summary.
+   Any approach to generating the summary is acceptable — a real model call, a cheap stub, or a hand-rolled extractor. The shape of the integration matters more than the text itself.
+3. The signature request is flagged as `vaulted`.
+
+---
 
 ## Rules
 
 - **Language:** Python.
-- **Framework:** FastAPI is the suggested framework. Anything else is fine if you're faster in it.
-- **Storage:** SQLite, JSON files on disk, or anything equivalent. A real database is fine but not expected.
-- **Files:** Save them to a local path inside the project.
+- **Framework:** FastAPI is the suggested framework. Use something else only if you're faster in it.
+- **Storage:** SQLite, JSON files on disk, or anything equivalent.
+- **Files:** Save uploaded files to a local path inside the project.
 - **AI tools, documentation, internet:** All allowed.
-- **Tests:** At least one for the visibility rule. More is better.
-- **Run-book:** Keep a short run-book below in this README so the service can be started and exercised together during the session.
+- **Tests:** Ship at least one test for the visibility rule. More is better.
+- **Run-book:** Fill in the run-book at the bottom of this README so the service can be started and exercised during the session.
 
 ## Out of scope
 
